@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { jwtVerify } from 'jose';
 import connectDB from '@/lib/db';
 import Booking from '@/lib/models/Booking';
+import mongoose from 'mongoose';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -27,31 +28,49 @@ export async function GET(request: Request) {
     const userId = verified.payload.userId as string;
     const userType = verified.payload.type as string;
 
+    // Ensure userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json(
+        { message: 'Invalid user ID' },
+        { status: 400 }
+      );
+    }
+
+    console.log('Fetching bookings for:', { userId, userType }); // Debug log
+
     let bookings;
     if (userType === 'daycare') {
       // If daycare, get bookings for this daycare with parent details
-      bookings = await Booking.find({ daycare: userId })
-        .populate({
-          path: 'parent',
-          select: 'name email phone', // Exclude sensitive info
-        })
-        .populate({
-          path: 'daycare',
-          select: 'name address city state operatingHours', // Include relevant daycare info
-        })
-        .sort({ createdAt: -1 });
+      bookings = await Booking.find({ 
+        daycare: new mongoose.Types.ObjectId(userId) 
+      })
+      .populate({
+        path: 'parent',
+        select: 'name email phone',
+      })
+      .populate({
+        path: 'daycare',
+        select: 'name address city state operatingHours',
+      })
+      .sort({ createdAt: -1 });
+
+      console.log('Found daycare bookings:', bookings.length); // Debug log
     } else {
       // If parent, get bookings made by this parent with daycare details
-      bookings = await Booking.find({ parent: userId })
-        .populate({
-          path: 'daycare',
-          select: 'name address city state operatingHours',
-        })
-        .populate({
-          path: 'parent',
-          select: 'name email phone',
-        })
-        .sort({ createdAt: -1 });
+      bookings = await Booking.find({ 
+        parent: new mongoose.Types.ObjectId(userId) 
+      })
+      .populate({
+        path: 'daycare',
+        select: 'name address city state operatingHours',
+      })
+      .populate({
+        path: 'parent',
+        select: 'name email phone',
+      })
+      .sort({ createdAt: -1 });
+
+      console.log('Found parent bookings:', bookings.length); // Debug log
     }
 
     return NextResponse.json(bookings);
@@ -106,10 +125,18 @@ export async function POST(request: Request) {
       notes,
     } = body;
 
+    // Ensure daycare ID is valid
+    if (!mongoose.Types.ObjectId.isValid(daycare)) {
+      return NextResponse.json(
+        { message: 'Invalid daycare ID' },
+        { status: 400 }
+      );
+    }
+
     // Create new booking
     const booking = await Booking.create({
-      parent: userId,
-      daycare,
+      parent: new mongoose.Types.ObjectId(userId),
+      daycare: new mongoose.Types.ObjectId(daycare),
       child: {
         name: childName,
         age: childAge,
