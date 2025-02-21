@@ -29,14 +29,28 @@ export async function GET(request: Request) {
 
     let bookings;
     if (userType === 'daycare') {
-      // If daycare, get bookings for this daycare
+      // If daycare, get bookings for this daycare with parent details
       bookings = await Booking.find({ daycare: userId })
-        .populate('parent', 'name email phone')
+        .populate({
+          path: 'parent',
+          select: 'name email phone', // Exclude sensitive info
+        })
+        .populate({
+          path: 'daycare',
+          select: 'name address city state operatingHours', // Include relevant daycare info
+        })
         .sort({ createdAt: -1 });
     } else {
-      // If parent, get bookings made by this parent
+      // If parent, get bookings made by this parent with daycare details
       bookings = await Booking.find({ parent: userId })
-        .populate('daycare', 'name address city state operatingHours')
+        .populate({
+          path: 'daycare',
+          select: 'name address city state operatingHours',
+        })
+        .populate({
+          path: 'parent',
+          select: 'name email phone',
+        })
         .sort({ createdAt: -1 });
     }
 
@@ -69,6 +83,15 @@ export async function POST(request: Request) {
       new TextEncoder().encode(JWT_SECRET)
     );
     const userId = verified.payload.userId as string;
+    const userType = verified.payload.type as string;
+
+    // Only parents can create bookings
+    if (userType !== 'parent') {
+      return NextResponse.json(
+        { message: 'Only parents can create bookings' },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json();
     const {
@@ -98,6 +121,18 @@ export async function POST(request: Request) {
       schedule,
       notes,
     });
+
+    // Populate the booking with parent and daycare details
+    await booking.populate([
+      {
+        path: 'parent',
+        select: 'name email phone',
+      },
+      {
+        path: 'daycare',
+        select: 'name address city state operatingHours',
+      },
+    ]);
 
     return NextResponse.json(
       { message: 'Booking created successfully', booking },
