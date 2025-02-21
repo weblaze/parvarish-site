@@ -33,14 +33,21 @@ export default function HomePage() {
 
   const fetchDaycares = async () => {
     try {
+      console.log('Fetching daycares...'); // Debug log
       const response = await fetch('/api/daycares');
+      console.log('Response status:', response.status); // Debug log
+      
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched daycares:', data); // Debug log
         setDaycares(data);
       } else {
+        const errorData = await response.json();
+        console.error('Error response:', errorData); // Debug log
         setError('Failed to fetch daycares');
       }
     } catch (err) {
+      console.error('Fetch error:', err); // Debug log
       setError('An error occurred while fetching daycares');
     } finally {
       setLoading(false);

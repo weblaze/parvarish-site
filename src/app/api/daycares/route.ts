@@ -6,14 +6,16 @@ export async function GET(request: Request) {
   try {
     await connectDB();
 
-    // Only fetch approved daycares and exclude sensitive information
+    // Fetch all daycares (removing isApproved filter for now)
     const daycares = await Daycare.find(
-      { isApproved: true },
+      {},
       {
         password: 0, // Exclude password
         __v: 0, // Exclude version key
       }
     );
+
+    console.log('Found daycares:', daycares.length); // Debug log
 
     return NextResponse.json(daycares);
   } catch (error: any) {
